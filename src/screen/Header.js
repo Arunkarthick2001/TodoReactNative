@@ -3,26 +3,38 @@ import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Icon, IconButton} from 'react-native-paper';
+import {signOut} from 'firebase/auth';
 
-const Header = ({fetchdata}) => {
+const Header = ({fetchdata, setIsRefresh}) => {
   const navigation = useNavigation();
 
   const handleLogout = async () => {
     try {
       // Clear the user's authentication state
       await AsyncStorage.removeItem('isLogin');
+      await AsyncStorage.removeItem('maintodo');
+      await AsyncStorage.removeItem('isData');
       // Navigate to the Login screen
       navigation.navigate('Login');
+      signOut;
     } catch (error) {
       console.error('Error clearing authentication state:', error);
     }
+  };
+  const onRefresh = () => {
+    fetchdata();
+    setIsRefresh(true);
   };
 
   return (
     <View style={styles.headerContainer}>
       <Text style={styles.headerTitle}>TodoList</Text>
       <View style={styles.rightContainer}>
-        <TouchableOpacity onPress={fetchdata}>
+        <TouchableOpacity
+          onPress={() => {
+            setIsRefresh(true);
+            fetchdata();
+          }}>
           <IconButton icon="refresh" />
         </TouchableOpacity>
         <TouchableOpacity onPress={handleLogout}>

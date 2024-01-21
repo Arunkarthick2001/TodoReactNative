@@ -19,6 +19,7 @@ import Nodata from './Nodata';
 import CompletedTask from './CompletedTask';
 import {useNavigation} from '@react-navigation/native';
 import Header from './Header';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 if (
   Platform.OS === 'android' &&
   UIManager.setLayoutAnimationEnabledExperimental
@@ -36,6 +37,7 @@ const TodoScreen = ({route}) => {
   const [completedTodoList, setCompletedTodoList] = useState([]);
   const [loading, setLoading] = useState(false);
   const userId = route.params?.data || '';
+  const [isRefresh, setIsRefresh] = useState(false);
   const rendertodos = ({item, index}) => {
     return (
       <View
@@ -88,7 +90,13 @@ const TodoScreen = ({route}) => {
       newTodo = {name: todo, id: Date.now().toString(), checked: false};
     else newTodo = {name: todo, id: editId, checked: false};
     const listItems = [...mainTodo, newTodo];
-
+    setTodoList([...todoList, newTodo]);
+    setMainTodo(listItems);
+    AsyncStorage.setItem('maintodo', JSON.stringify(listItems));
+    setLoading(false);
+    setEditId();
+    setEditTodo(false);
+    setTodo('');
     // console.log(uid);
     const dataRef = ref(database, uid);
     await set(dataRef, listItems)
@@ -98,16 +106,11 @@ const TodoScreen = ({route}) => {
       .catch(error => {
         console.error('Data written error for Add operation', error);
       });
-    setLoading(false);
-    setEditId();
-    setEditTodo(false);
-    setTodoList([...todoList, newTodo]);
-    setMainTodo(listItems);
-    setTodo('');
   };
   const handleDelete = async (id, checked) => {
     const listItems = mainTodo.filter(item => item.id !== id);
     setMainTodo(listItems);
+    AsyncStorage.setItem('maintodo', JSON.stringify(listItems));
     setTodoList(listItems.filter(item => item.checked === false));
     setCompletedTodoList(listItems.filter(item => item.checked !== false));
     const dataRef = ref(database, uid);
@@ -127,6 +130,7 @@ const TodoScreen = ({route}) => {
     setTodo(name);
     const listItems = mainTodo.filter(item => item.id !== id);
     const newTodoList = [...listItems];
+
     console.log(newTodoList);
     setTodoList(newTodoList);
   };
@@ -159,6 +163,7 @@ const TodoScreen = ({route}) => {
       {id: item.id, name: item.name, checked: !item.checked},
     ];
     setMainTodo(newTodoList);
+    AsyncStorage.setItem('maintodo', JSON.stringify(newTodoList));
     setCompletedTodoList(newTodoList.filter(item => item.checked !== false));
     setTodoList(newTodoList.filter(item => item.checked === false));
     const dataRef = ref(database, uid);
@@ -185,27 +190,58 @@ const TodoScreen = ({route}) => {
   const auth = getAuth(firebaseApp);
   async function fetchData(dat) {
     setLoading(true);
-    const dataRef = ref(database, uid);
-    get(dataRef)
-      .then(snapshot => {
-        if (snapshot.exists()) {
-          const data = snapshot.val();
-          // console.log('Data: ', data);
-          setMainTodo(data);
-          const completedItems = data.filter(item => item.checked === true);
-          setCompletedTodoList(completedItems);
-          const todoItems = data.filter(item => item.checked === false);
-          setTodoList(todoItems);
-          setLoading(false);
-        } else {
-          setLoading(false);
 
-          //   console.log("No data available");
-        }
-      })
-      .catch(error => {
-        console.error('Error getting data:', error);
-      });
+    // console.log('isdata', await AsyncStorage.getItem('isData'));
+    if ((await AsyncStorage.getItem('isData')) === 'true') {
+      var localData = JSON.parse(await AsyncStorage.getItem('maintodo'));
+      console.log(localData);
+      setMainTodo(localData);
+      const localTompletedItems = localData.filter(
+        item => item.checked === true,
+      );
+      setCompletedTodoList(localTompletedItems);
+      const localTodoItems = localData.filter(item => item.checked === false);
+      setTodoList(localTodoItems);
+      setLoading(false);
+    }
+    const dataRef = ref(database, uid);
+    var isData = await AsyncStorage.getItem('isData');
+
+    if (isData !== 'true' || isRefresh) {
+      get(dataRef)
+        .then(snapshot => {
+          if (snapshot.exists()) {
+            const data = snapshot.val();
+            // console.log('Data: ', data);
+            console.log('fetch', data);
+            AsyncStorage.setItem('maintodo', JSON.stringify(data));
+            AsyncStorage.setItem('isData', 'true');
+
+            setMainTodo(data);
+            const completedItems = data.filter(item => item.checked === true);
+            setCompletedTodoList(completedItems);
+            const todoItems = data.filter(item => item.checked === false);
+            setTodoList(todoItems);
+            setLoading(false);
+            setIsRefresh(false);
+          } else {
+            setLoading(false);
+
+            //   console.log("No data available");
+          }
+        })
+        .catch(error => {
+          console.error('Error getting data:', error);
+        });
+    } else {
+      await set(dataRef, JSON.parse(await AsyncStorage.getItem('maintodo')))
+        .then(() => {
+          console.log('Data written for update of offline data operation');
+        })
+        .catch(error => {
+          console.error('Data written error for delete operation', error);
+        });
+    }
   }
   const [uid, setUid] = useState(userId);
   useEffect(() => {
@@ -228,7 +264,7 @@ const TodoScreen = ({route}) => {
   };
   return (
     <View style={{marginHorizontal: 3}}>
-      <Header fetchdata={fetchData}></Header>
+      <Header fetchdata={fetchData} setIsRefresh={setIsRefresh}></Header>
       <View style={{alignItems: 'center'}}>
         {loading ? (
           <ActivityIndicator

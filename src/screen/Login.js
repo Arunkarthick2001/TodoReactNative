@@ -25,10 +25,11 @@ const Login = ({navigation}) => {
       try {
         // Check if the user is already logged in
         const storedIsLogin = await AsyncStorage.getItem('isLogin');
+        // console.log(storedIsLogin);
         if (storedIsLogin) {
           navigation.navigate('Home', {data: storedIsLogin});
         } else {
-          alert('Session expired. Kindly login again');
+          // alert('Session expired. Kindly login again');
         }
       } catch (error) {
         console.error('Error checking authentication state:', error);
@@ -69,7 +70,7 @@ const Login = ({navigation}) => {
       setUserPassword('');
       console.log(user.uid, 'USER');
     } catch (error) {
-      alert('signup error');
+      alert(error.message);
     }
   };
   const [login, setLogin] = useState(true);

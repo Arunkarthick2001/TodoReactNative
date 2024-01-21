@@ -5,21 +5,36 @@ import {
   TouchableOpacity,
   View,
   FlatList,
+  TouchableWithoutFeedback,
+  LayoutAnimation,
+  UIManager,
+  ActivityIndicator,
 } from 'react-native';
-// import Icon from 'react-native-vector-icons';
 import {Checkbox, IconButton} from 'react-native-paper';
 import React, {useEffect, useRef, useState} from 'react';
 import {getDatabase, ref, get, set} from 'firebase/database';
 import {firebaseApp} from '../../Firebase';
-import {getAuth, onAuthStateChanged} from 'firebase/auth';
-import {Image} from '@rneui/themed';
+import {getAuth, onAuthStateChanged, signOut} from 'firebase/auth';
 import Nodata from './Nodata';
+import CompletedTask from './CompletedTask';
+import {useNavigation} from '@react-navigation/native';
+import Header from './Header';
+if (
+  Platform.OS === 'android' &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 const TodoScreen = ({route}) => {
   const inputRef = useRef(null);
+  const navigation = useNavigation();
   const [todo, setTodo] = useState('');
+  const [mainTodo, setMainTodo] = useState([]);
   const [todoList, setTodoList] = useState([]);
   const [editTodo, setEditTodo] = useState(false);
-
+  const [editId, setEditId] = useState();
+  const [completedTodoList, setCompletedTodoList] = useState([]);
+  const [loading, setLoading] = useState(false);
   const userId = route.params?.data || '';
   const rendertodos = ({item, index}) => {
     return (
@@ -66,15 +81,14 @@ const TodoScreen = ({route}) => {
     );
   };
   const handleAddTodo = async () => {
+    setLoading(true);
     inputRef.current.blur();
-    const listItems = [
-      ...todoList,
-      {name: todo, id: Date.now().toString(), checked: false},
-    ];
-    setTodoList([
-      ...todoList,
-      {name: todo, id: Date.now().toString(), checked: false},
-    ]);
+    var newTodo;
+    if (!editTodo)
+      newTodo = {name: todo, id: Date.now().toString(), checked: false};
+    else newTodo = {name: todo, id: editId, checked: false};
+    const listItems = [...mainTodo, newTodo];
+
     // console.log(uid);
     const dataRef = ref(database, uid);
     await set(dataRef, listItems)
@@ -84,13 +98,18 @@ const TodoScreen = ({route}) => {
       .catch(error => {
         console.error('Data written error for Add operation', error);
       });
+    setLoading(false);
+    setEditId();
+    setEditTodo(false);
+    setTodoList([...todoList, newTodo]);
+    setMainTodo(listItems);
     setTodo('');
   };
-  const handleDelete = async id => {
-    // console.log("del");
-    const listItems = todoList.filter(item => item.id !== id);
-    setTodoList(listItems);
-    // console.log(listItems);
+  const handleDelete = async (id, checked) => {
+    const listItems = mainTodo.filter(item => item.id !== id);
+    setMainTodo(listItems);
+    setTodoList(listItems.filter(item => item.checked === false));
+    setCompletedTodoList(listItems.filter(item => item.checked !== false));
     const dataRef = ref(database, uid);
     await set(dataRef, listItems)
       .then(() => {
@@ -102,21 +121,46 @@ const TodoScreen = ({route}) => {
   };
   const handleEdit = (id, name) => {
     setEditTodo(true);
+    setEditId(id);
     // console.log(todoList);
     inputRef.current.focus();
     setTodo(name);
-    const listItems = todoList.filter(item => item.id !== id);
+    const listItems = mainTodo.filter(item => item.id !== id);
     const newTodoList = [...listItems];
     console.log(newTodoList);
     setTodoList(newTodoList);
   };
+  const handleEditSave = async () => {
+    inputRef.current.blur();
+    const listItems = [
+      ...todoList,
+      {name: todo, id: Date.now().toString(), checked: false},
+    ];
+
+    // console.log(uid);
+    const dataRef = ref(database, uid);
+    await set(dataRef, listItems)
+      .then(() => {
+        // console.log("Data written for Add operation");
+      })
+      .catch(error => {
+        console.error('Data written error for Add operation', error);
+      });
+    setTodoList([
+      ...todoList,
+      {name: todo, id: Date.now().toString(), checked: false},
+    ]);
+    setTodo('');
+  };
   const handleCheck = async item => {
-    const listItems = todoList.filter(items => items.id !== item.id);
+    const listItems = mainTodo.filter(items => items.id !== item.id);
     const newTodoList = [
       ...listItems,
       {id: item.id, name: item.name, checked: !item.checked},
     ];
-    setTodoList(newTodoList);
+    setMainTodo(newTodoList);
+    setCompletedTodoList(newTodoList.filter(item => item.checked !== false));
+    setTodoList(newTodoList.filter(item => item.checked === false));
     const dataRef = ref(database, uid);
     await set(dataRef, newTodoList)
       .then(() => {
@@ -140,15 +184,22 @@ const TodoScreen = ({route}) => {
   const database = getDatabase(firebaseApp);
   const auth = getAuth(firebaseApp);
   async function fetchData(dat) {
-    console.log(dat);
+    setLoading(true);
     const dataRef = ref(database, uid);
     get(dataRef)
       .then(snapshot => {
         if (snapshot.exists()) {
           const data = snapshot.val();
-          //   console.log("Data: ", data);
-          setTodoList(data);
+          // console.log('Data: ', data);
+          setMainTodo(data);
+          const completedItems = data.filter(item => item.checked === true);
+          setCompletedTodoList(completedItems);
+          const todoItems = data.filter(item => item.checked === false);
+          setTodoList(todoItems);
+          setLoading(false);
         } else {
+          setLoading(false);
+
           //   console.log("No data available");
         }
       })
@@ -158,6 +209,8 @@ const TodoScreen = ({route}) => {
   }
   const [uid, setUid] = useState(userId);
   useEffect(() => {
+    setCompletedItems(false);
+    setLoading(true);
     onAuthStateChanged(auth, user => {
       if (user) {
         setUid(user.uid);
@@ -167,17 +220,30 @@ const TodoScreen = ({route}) => {
       }
     });
   }, []);
+  const [completedItems, setCompletedItems] = useState(false);
+  const openCompletedTask = () => {
+    // console.log('Completed task open');
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setCompletedItems(!completedItems);
+  };
   return (
-    <View style={{marginHorizontal: 16}}>
-      <Text
-        style={{
-          textAlign: 'center',
-          color: 'black',
-          fontSize: 20,
-          fontWeight: 700,
-        }}>
-        TodoList
-      </Text>
+    <View style={{marginHorizontal: 3}}>
+      <Header fetchdata={fetchData}></Header>
+      <View style={{alignItems: 'center'}}>
+        {loading ? (
+          <ActivityIndicator
+            size="large"
+            color="black"
+            style={{
+              position: 'absolute',
+              backgroundColor: 'rgba(0, 255, 0, )',
+              padding: 500,
+            }}
+          />
+        ) : (
+          ''
+        )}
+      </View>
       <TextInput
         ref={inputRef}
         style={{
@@ -225,12 +291,50 @@ const TodoScreen = ({route}) => {
           </Text>
         )}
       </TouchableOpacity>
+      <TouchableWithoutFeedback
+        style={completedItems ? styles.completedOpen : styles.completedClose}>
+        <Text
+          style={{
+            fontSize: 20,
+            textDecorationLine: 'underline',
+            color: 'black',
+            fontWeight: 700,
+          }}>
+          My tasks
+        </Text>
+      </TouchableWithoutFeedback>
       {todoList.length != 0 ? (
         <FlatList data={todoList} renderItem={rendertodos}></FlatList>
       ) : (
-        <View style={{alignContent: 'center', alignItems: 'center'}}>
+        <View>
           <Nodata />
         </View>
+      )}
+      <TouchableOpacity
+        onPress={openCompletedTask}
+        style={completedItems ? styles.completedOpen : styles.completedClose}>
+        <Text style={{fontSize: 20, alignItems: 'flex-start'}}>
+          Completed tasks
+        </Text>
+        <IconButton
+          icon={
+            !completedItems ? 'arrow-down-drop-circle' : 'arrow-up-drop-circle'
+          }
+          size={17}></IconButton>
+      </TouchableOpacity>
+      {completedItems ? (
+        <CompletedTask
+          data={completedTodoList}
+          uid={uid}
+          todoList={todoList}
+          editTodo={editTodo}
+          setEditTodo={setEditTodo}
+          setTodoList={setTodoList}
+          handleCheck={handleCheck}
+          handleDelete={handleDelete}
+          handleEdit={handleEdit}></CompletedTask>
+      ) : (
+        ''
       )}
     </View>
   );
@@ -238,4 +342,26 @@ const TodoScreen = ({route}) => {
 
 export default TodoScreen;
 
-const styles = StyleSheet.create({});
+const styles = StyleSheet.create({
+  completedOpen: {
+    alignContent: 'center',
+    backgroundColor: '#e6e6e6',
+    marginTop: 20,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    color: 'black',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  completedClose: {
+    alignContent: 'center',
+    backgroundColor: '#d9d9d9',
+    marginTop: 20,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    color: 'red',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+});

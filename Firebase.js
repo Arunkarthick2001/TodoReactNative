@@ -1,6 +1,11 @@
 import {createContext, useContext} from 'react';
 import {initializeApp} from 'firebase/app';
-import {getAuth} from 'firebase/auth';
+import {
+  initializeAuth,
+  getAuth,
+  getReactNativePersistence,
+} from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -18,7 +23,9 @@ const firebaseConfig = {
   databaseURL: 'https://student-database-a9aac-default-rtdb.firebaseio.com/',
 };
 export const firebaseApp = initializeApp(firebaseConfig);
-const firebaseAuth = getAuth(firebaseApp);
+const firebaseAuth = initializeAuth(firebaseApp, {
+  persistence: getReactNativePersistence(AsyncStorage),
+});
 const db = getDatabase(firebaseApp);
 
 const FirebaseContext = createContext(null);

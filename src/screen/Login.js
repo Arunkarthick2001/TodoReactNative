@@ -1,4 +1,4 @@
-import React, {useRef, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   StyleSheet,
   Text,
@@ -13,12 +13,30 @@ import {
   signInWithEmailAndPassword,
 } from 'firebase/auth';
 import {firebaseApp} from '../../Firebase';
+import {getReactNativePersistence} from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Login = ({navigation}) => {
   const [userId, setUserId] = useState('arunkarthick3002@gmail.com');
   const [userPassword, setUserPassword] = useState('Arun@123');
   const firebaseAuth = getAuth(firebaseApp);
+  useEffect(() => {
+    const checkLoginState = async () => {
+      try {
+        // Check if the user is already logged in
+        const storedIsLogin = await AsyncStorage.getItem('isLogin');
+        if (storedIsLogin) {
+          navigation.navigate('Home', {data: storedIsLogin});
+        } else {
+          alert('Session expired. Kindly login again');
+        }
+      } catch (error) {
+        console.error('Error checking authentication state:', error);
+      }
+    };
 
+    checkLoginState();
+  }, []);
   const onLogin = async () => {
     try {
       const userCredential = await signInWithEmailAndPassword(
@@ -31,6 +49,7 @@ const Login = ({navigation}) => {
       navigation.navigate('Home', {data: user.uid});
       setUserId('');
       setUserPassword('');
+      AsyncStorage.setItem('isLogin', user.uid);
     } catch (error) {
       const errorMessage = error.message;
       alert(`${errorMessage}`);
@@ -56,96 +75,9 @@ const Login = ({navigation}) => {
   const [login, setLogin] = useState(true);
 
   const onSwitch = () => {
-    console.log('onwitch');
     setLogin(!login); // Toggle the login state
   };
   const inputRef = useRef(null);
-  const Login = () => {
-    return (
-      <View style={styles.container}>
-        <Text
-          style={{
-            textAlign: 'center',
-            fontSize: 30,
-            fontWeight: '700',
-            color: 'black',
-          }}>
-          Login
-        </Text>
-        <Text style={styles.label}>Userid</Text>
-        <TextInput
-          style={styles.input}
-          value={userId}
-          onChangeText={userText => setUserId(userText)}
-          placeholder="userid"
-          ref={inputRef}
-        />
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          value={userPassword}
-          onChangeText={userPass => setUserPassword(userPass)}
-          placeholder="Password"
-        />
-        <Button
-          disabled={!userId || !userPassword}
-          onPress={onLogin}
-          title="Login"
-        />
-        <Text>
-          Already have an account{' '}
-          <TouchableOpacity onPress={onSwitch}>
-            <Text style={{color: 'blue', textDecorationLine: 'underline'}}>
-              click here
-            </Text>
-          </TouchableOpacity>
-        </Text>
-      </View>
-    );
-  };
-
-  const Signup = () => {
-    return (
-      <View style={styles.container}>
-        <Text
-          style={{
-            textAlign: 'center',
-            fontSize: 30,
-            fontWeight: '700',
-            color: 'black',
-          }}>
-          Signup
-        </Text>
-        <Text style={styles.label}>UserId</Text>
-        <TextInput
-          style={styles.input}
-          value={userId}
-          onChangeText={userText => setUserId(userText)}
-          placeholder="userid"
-        />
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          value={userPassword}
-          onChangeText={userPass => setUserPassword(userPass)}
-          placeholder="Password"
-        />
-        <Button
-          disabled={!userId || !userPassword}
-          onPress={onSignup}
-          title="SignUp"
-        />
-        <Text>
-          Already have an account{' '}
-          <TouchableOpacity onPress={onSwitch}>
-            <Text style={{color: 'blue', textDecorationLine: 'underline'}}>
-              click here
-            </Text>
-          </TouchableOpacity>
-        </Text>
-      </View>
-    );
-  };
 
   return (
     <View>
@@ -180,14 +112,15 @@ const Login = ({navigation}) => {
             onPress={onLogin}
             title="Login"
           />
-          <Text>
-            Already have an account{' '}
-            <TouchableOpacity onPress={onSwitch}>
+
+          <TouchableOpacity onPress={onSwitch}>
+            <Text>
+              <Text> Don't have an account </Text>
               <Text style={{color: 'blue', textDecorationLine: 'underline'}}>
                 click here
               </Text>
-            </TouchableOpacity>
-          </Text>
+            </Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <View style={styles.container}>
@@ -219,19 +152,14 @@ const Login = ({navigation}) => {
             onPress={onSignup}
             title="SignUp"
           />
-          <Text>
-            Already have an account{' '}
-            <TouchableOpacity onPress={onSwitch}>
-              <Text
-                style={{
-                  color: 'blue',
-                  textDecorationLine: 'underline',
-                  textAlignVertical: 'center',
-                }}>
+          <TouchableOpacity onPress={onSwitch}>
+            <Text>
+              <Text> Already have an account </Text>
+              <Text style={{color: 'blue', textDecorationLine: 'underline'}}>
                 click here
               </Text>
-            </TouchableOpacity>
-          </Text>
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
     </View>

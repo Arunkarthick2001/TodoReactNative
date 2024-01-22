@@ -9,6 +9,7 @@ import {
   LayoutAnimation,
   UIManager,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import {Checkbox, IconButton} from 'react-native-paper';
 import React, {useEffect, useRef, useState} from 'react';
@@ -130,9 +131,10 @@ const TodoScreen = ({route}) => {
     setTodo(name);
     const listItems = mainTodo.filter(item => item.id !== id);
     const newTodoList = [...listItems];
-
-    console.log(newTodoList);
-    setTodoList(newTodoList);
+    setMainTodo(listItems);
+    AsyncStorage.setItem('maintodo', JSON.stringify(listItems));
+    // console.log(newTodoList);
+    setTodoList(newTodoList.filter(item => item.checked === false));
   };
   const handleEditSave = async () => {
     inputRef.current.blur();
@@ -194,7 +196,6 @@ const TodoScreen = ({route}) => {
     // console.log('isdata', await AsyncStorage.getItem('isData'));
     if ((await AsyncStorage.getItem('isData')) === 'true') {
       var localData = JSON.parse(await AsyncStorage.getItem('maintodo'));
-      console.log(localData);
       setMainTodo(localData);
       const localTompletedItems = localData.filter(
         item => item.checked === true,
@@ -236,7 +237,7 @@ const TodoScreen = ({route}) => {
     } else {
       await set(dataRef, JSON.parse(await AsyncStorage.getItem('maintodo')))
         .then(() => {
-          console.log('Data written for update of offline data operation');
+          // console.log('Data written for update of offline data operation');
         })
         .catch(error => {
           console.error('Data written error for delete operation', error);
@@ -304,7 +305,9 @@ const TodoScreen = ({route}) => {
           borderRadius: 10,
           alignItems: 'center',
         }}
-        onPress={handleAddTodo}>
+        onPress={() => {
+          if (todo.length !== 0) handleAddTodo();
+        }}>
         {editTodo ? (
           <Text
             style={{

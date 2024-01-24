@@ -5,6 +5,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Dimensions,
 } from 'react-native';
 import TodoScreen from './src/screen/TodoScreen';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
@@ -31,6 +32,8 @@ const Logout = () => {
   );
 };
 export default function App() {
+  const {width, height} = Dimensions.get('window');
+
   const [isLogin, setIsLogin] = useState(false);
   const auth = getAuth(firebaseApp);
 
@@ -60,7 +63,7 @@ export default function App() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={{height: height - 10}}>
       <NavigationContainer>
         <Stack.Navigator initialRouteName={isLogin ? 'Home' : 'Login'}>
           <Stack.Screen
